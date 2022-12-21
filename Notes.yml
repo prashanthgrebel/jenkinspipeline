@@ -1,0 +1,61 @@
+pipeline {
+      environment {
+    dockerimagename = "registry.prashanth.private:5000/$Build_image"
+    dockerImage = ""
+    image = "$build_image"
+    TAG="$Build_image"
+    SSH_ARG="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -q"
+  }
+  agent any
+  
+  stages{
+      
+      stage('git checkout'){
+          steps {
+              git branch: 'main', url: 'https://github.com/prashanthgrebel/My_notes.git'
+          }
+      }
+      
+      stage('Building Image'){
+          steps{
+              
+                 sh 'sudo docker build -t $dockerimagename .'
+              
+          }
+          
+      }
+      
+      stage('Pushing Image to registry'){
+          steps{
+              sh '''
+              sudo docker tag $dockerimagename  $dockerimagename
+              sudo docker push $dockerimagename
+              '''
+          }
+      }
+      
+      stage('Docker container deploy on Local Machine'){
+          steps{
+              sh 'sudo TAG=$Build_image docker-compose -f /home/prashanthg/projects/Docker/notes-docker-compose.yml up -d notes'
+              
+              
+          }
+      }
+      
+      stage('Docker container deploy on remote Machine'){
+          steps{
+              sshagent(['ssh_auth']) {
+                  sh 'ssh $SSH_ARG prashanthg@172.29.87.123 "sudo TAG=$Build_image docker-compose -f /home/prashanthg/projects/Docker/notes-docker-compose.yml up -d notes"'
+              }
+              
+          }
+      }
+      stage('Deleting Old Docker Img from Jenkins server'){
+          steps{
+              sh 'sudo docker rmi registry.prashanth.private:5000/$Del_image'
+          }
+      }
+     
+  }
+  
+}
